@@ -1,0 +1,12 @@
+{
+  "id": "clashVerge",
+  "name": "Clash Verge",
+  "description": "Lightweight Clash Verge overview, switching, and on-demand delay testing popout for DankMaterialShell",
+  "version": "0.1.0",
+  "author": "youngshine",
+  "icon": "vpn_lock",
+  "type": "widget",
+  "component": "./ClashVerge.qml",
+  "capabilities": ["dankbar-widget"],
+  "permissions": ["process"]
+}
