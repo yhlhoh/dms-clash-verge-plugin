@@ -61,3 +61,7 @@ The first open may take a little longer while that environment is created.
 ## License
 
 MIT
+
+## Screenshot
+
+![Clash Verge plugin screenshot](./screenshot.png)
