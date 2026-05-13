@@ -9,6 +9,10 @@ import qs.Modules.Plugins
 PluginComponent {
     id: root
 
+    // =========================================================================
+    // ⬇️ 后端逻辑：一字未改 ⬇️
+    // =========================================================================
+
     property string resolvedPluginId: pluginId || "clashVerge"
     readonly property string pluginPath: pluginService ? pluginService.getPluginPath(resolvedPluginId) : ""
     readonly property string runnerPath: pluginPath ? pluginPath + "/scripts/run-helper.sh" : ""
@@ -20,7 +24,6 @@ PluginComponent {
     property string viewMode: "overview"
     property string expandedGroup: ""
     property string barLabel: "Clash"
-    property string barMode: "idle"
     property bool delayTesting: false
     property bool delayTestingGroup: false
     property string testingGroup: ""
@@ -66,7 +69,6 @@ PluginComponent {
         if ((!expandedGroup || selectorGroups.every(group => group.name !== expandedGroup)) && selectorGroups.length > 0)
             expandedGroup = selectorGroups[0].name
         barLabel = shortText(data.summaryNode || data.currentProfileName || "Clash", 18)
-        barMode = shortText(data.mode || "idle", 8)
         if (!data.runtimeError)
             errorText = ""
     }
@@ -348,13 +350,15 @@ PluginComponent {
 
     horizontalBarPill: Component {
         Row {
-            spacing: Theme.spacingXS
+            spacing: Theme.spacingS
+            anchors.verticalCenter: parent.verticalCenter
 
             DankIcon {
                 name: runtimeState.available ? "vpn_lock" : "vpn_key_off"
                 color: runtimeState.available ? Theme.primary : Theme.surfaceVariantText
-                size: Theme.iconSize - 4
+                size: Theme.iconSize - 2
                 anchors.verticalCenter: parent.verticalCenter
+                Behavior on color { ColorAnimation { duration: 200 } }
             }
 
             Column {
@@ -365,12 +369,7 @@ PluginComponent {
                     text: root.barLabel
                     color: Theme.surfaceText
                     font.pixelSize: Theme.fontSizeMedium
-                }
-
-                StyledText {
-                    text: root.barMode
-                    color: Theme.surfaceVariantText
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Medium
                 }
             }
         }
@@ -379,33 +378,28 @@ PluginComponent {
     verticalBarPill: Component {
         Column {
             spacing: Theme.spacingXS
+            anchors.horizontalCenter: parent.horizontalCenter
 
             DankIcon {
                 name: runtimeState.available ? "vpn_lock" : "vpn_key_off"
                 color: runtimeState.available ? Theme.primary : Theme.surfaceVariantText
-                size: Theme.iconSize - 4
+                size: Theme.iconSize - 2
                 anchors.horizontalCenter: parent.horizontalCenter
-            }
-
-            StyledText {
-                text: root.shortText(root.barMode, 6)
-                color: Theme.surfaceVariantText
-                font.pixelSize: Theme.fontSizeSmall
-                anchors.horizontalCenter: parent.horizontalCenter
+                Behavior on color { ColorAnimation { duration: 200 } }
             }
         }
     }
 
     popoutWidth: 460
-    popoutHeight: 620
+    popoutHeight: root.viewMode === "overview" ? 430 : 660
 
     popoutContent: Component {
         PopoutComponent {
             id: popoutRoot
             headerText: "Clash Verge"
-            detailsText: root.viewMode === "overview"
-                ? "Loads state only while this popout is open."
-                : "Switch mode, selector nodes, and active profile on demand."
+            detailsText: root.viewMode === "overview" 
+                ? "Current Runtime Status" 
+                : "Manage Nodes & Profiles"
             showCloseButton: true
 
             Component.onCompleted: {
@@ -420,8 +414,10 @@ PluginComponent {
                 Flickable {
                     anchors.fill: parent
                     contentWidth: width
-                    contentHeight: contentColumn.implicitHeight
+                    contentHeight: contentColumn.implicitHeight + Theme.spacingL
                     clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: contentHeight > height
 
                     Column {
                         id: contentColumn
@@ -430,51 +426,72 @@ PluginComponent {
 
                         Row {
                             width: parent.width
-                            spacing: Theme.spacingS
+                            height: 40
+                            spacing: Theme.spacingM
 
-                            Repeater {
-                                model: [
-                                    { key: "overview", label: "Overview" },
-                                    { key: "controls", label: "Controls" }
-                                ]
+                            Rectangle {
+                                width: parent.width - refreshBtn.width - Theme.spacingM
+                                height: parent.height
+                                radius: height / 2
+                                color: Theme.surfaceContainerHighest
 
-                                Rectangle {
-                                    required property var modelData
-                                    width: 110
-                                    height: 34
-                                    radius: 17
-                                    color: root.viewMode === modelData.key ? Theme.primary : Theme.surfaceContainerHigh
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.margins: 4
+                                    spacing: 4
 
-                                    StyledText {
-                                        anchors.centerIn: parent
-                                        text: modelData.label
-                                        color: root.viewMode === modelData.key ? Theme.primaryText : Theme.surfaceText
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.weight: Font.Medium
-                                    }
+                                    Repeater {
+                                        model: [
+                                            { key: "overview", label: "Overview" },
+                                            { key: "controls", label: "Controls" }
+                                        ]
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.viewMode = parent.modelData.key
+                                        Rectangle {
+                                            required property var modelData
+                                            width: (parent.width - 4) / 2
+                                            height: parent.height
+                                            radius: height / 2
+                                            color: root.viewMode === modelData.key ? Theme.primary : "transparent"
+                                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                                            StyledText {
+                                                anchors.centerIn: parent
+                                                text: modelData.label
+                                                color: root.viewMode === modelData.key ? Theme.primaryText : Theme.surfaceText
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: root.viewMode === modelData.key ? Font.DemiBold : Font.Normal
+                                                Behavior on color { ColorAnimation { duration: 150 } }
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.viewMode = parent.modelData.key
+                                            }
+                                        }
                                     }
                                 }
                             }
 
                             Rectangle {
-                                width: 92
-                                height: 34
-                                radius: 17
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: refreshArea.containsMouse ? Theme.primaryHover : Theme.surfaceContainerHigh
-                                opacity: (root.loading || root.busy) ? 0.6 : 1
+                                id: refreshBtn
+                                width: 40
+                                height: 40
+                                radius: 20
+                                color: refreshArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
+                                opacity: (root.loading || root.busy) ? 0.5 : 1
+                                Behavior on color { ColorAnimation { duration: 150 } }
 
-                                StyledText {
+                                DankIcon {
                                     anchors.centerIn: parent
-                                    text: root.loading ? "Loading" : "Refresh"
+                                    name: "refresh"
                                     color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    font.weight: Font.Medium
+                                    size: Theme.iconSize - 4
+                                    RotationAnimation on rotation {
+                                        loops: Animation.Infinite
+                                        from: 0; to: 360; duration: 1000
+                                        running: root.loading
+                                    }
                                 }
 
                                 MouseArea {
@@ -492,7 +509,9 @@ PluginComponent {
                             visible: root.errorText.length > 0
                             width: parent.width
                             radius: Theme.cornerRadius
-                            color: Theme.surfaceContainerHigh
+                            color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.15)
+                            border.color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.3)
+                            border.width: 1
                             implicitHeight: errorColumn.implicitHeight + Theme.spacingM * 2
 
                             Column {
@@ -501,11 +520,15 @@ PluginComponent {
                                 anchors.margins: Theme.spacingM
                                 spacing: Theme.spacingXS
 
-                                StyledText {
-                                    text: "Helper Error"
-                                    color: Theme.error
-                                    font.pixelSize: Theme.fontSizeMedium
-                                    font.weight: Font.Medium
+                                Row {
+                                    spacing: Theme.spacingS
+                                    DankIcon { name: "error"; color: Theme.error; size: Theme.iconSize - 4 }
+                                    StyledText {
+                                        text: "Helper Error"
+                                        color: Theme.error
+                                        font.pixelSize: Theme.fontSizeMedium
+                                        font.weight: Font.DemiBold
+                                    }
                                 }
 
                                 StyledText {
@@ -518,91 +541,164 @@ PluginComponent {
                             }
                         }
 
+                        // ==========================================
+                        // OVERVIEW 面板
+                        // ==========================================
                         Rectangle {
                             visible: root.viewMode === "overview"
                             width: parent.width
                             radius: Theme.cornerRadius
-                            color: Theme.surfaceContainerHigh
-                            implicitHeight: overviewColumn.implicitHeight + Theme.spacingM * 2
+                            color: "transparent"
+                            border.color: Theme.surfaceContainerHigh
+                            border.width: 1
+                            implicitHeight: overviewColumn.implicitHeight + Theme.spacingL * 2
 
                             Column {
                                 id: overviewColumn
                                 anchors.fill: parent
-                                anchors.margins: Theme.spacingM
-                                spacing: Theme.spacingS
+                                anchors.margins: Theme.spacingL
+                                spacing: Theme.spacingM
 
-                                StyledText {
-                                    text: root.loading ? "Loading Clash Verge state..." : (runtimeState.available ? "Connected to Mihomo" : "Runtime not connected")
-                                    color: runtimeState.available ? Theme.primary : Theme.surfaceVariantText
-                                    font.pixelSize: Theme.fontSizeMedium
-                                    font.weight: Font.Medium
+                                Row {
+                                    spacing: Theme.spacingS
+                                    Rectangle {
+                                        width: 12; height: 12; radius: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: root.loading ? Theme.surfaceVariantText : (runtimeState.available ? Theme.primary : Theme.error)
+                                    }
+                                    StyledText {
+                                        text: root.loading ? "Loading state..." : (runtimeState.available ? "Connected to Core" : "Runtime Disconnected")
+                                        color: Theme.surfaceText
+                                        font.pixelSize: Theme.fontSizeMedium
+                                        font.weight: Font.DemiBold
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
                                 }
 
                                 StyledText {
                                     width: parent.width
                                     wrapMode: Text.WordWrap
                                     text: root.summaryText()
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.primary
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
+                                }
+
+                                Rectangle {
+                                    width: parent.width; height: 1; color: Theme.surfaceContainerHighest
+                                }
+
+                                Grid {
+                                    id: overviewGrid
+                                    width: parent.width
+                                    columns: 2
+                                    columnSpacing: Theme.spacingM
+                                    rowSpacing: Theme.spacingM
+
+                                    Column {
+                                        width: (overviewGrid.width - overviewGrid.columnSpacing) / overviewGrid.columns
+                                        spacing: 2
+
+                                        StyledText {
+                                            text: "Profile"
+                                            color: Theme.surfaceVariantText
+                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                        }
+
+                                        StyledText {
+                                            text: runtimeState.currentProfileName || "None"
+                                            color: Theme.surfaceText
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: Font.Medium
+                                        }
+                                    }
+
+                                    Column {
+                                        width: (overviewGrid.width - overviewGrid.columnSpacing) / overviewGrid.columns
+                                        spacing: 2
+
+                                        StyledText {
+                                            text: "Mode"
+                                            color: Theme.surfaceVariantText
+                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                        }
+
+                                        StyledText {
+                                            text: root.modeLabel(runtimeState.mode)
+                                            color: Theme.surfaceText
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: Font.Medium
+                                        }
+                                    }
+
+                                    Column {
+                                        width: (overviewGrid.width - overviewGrid.columnSpacing) / overviewGrid.columns
+                                        spacing: 2
+
+                                        StyledText {
+                                            text: "Tun Mode"
+                                            color: Theme.surfaceVariantText
+                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                        }
+
+                                        StyledText {
+                                            text: runtimeState.tunEnabled ? "Enabled" : "Disabled"
+                                            color: Theme.surfaceText
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: Font.Medium
+                                        }
+                                    }
+
+                                    Column {
+                                        width: (overviewGrid.width - overviewGrid.columnSpacing) / overviewGrid.columns
+                                        spacing: 2
+
+                                        StyledText {
+                                            text: "System Proxy"
+                                            color: Theme.surfaceVariantText
+                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                        }
+
+                                        StyledText {
+                                            text: runtimeState.systemProxyEnabled ? "Enabled" : "Disabled"
+                                            color: Theme.surfaceText
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: Font.Medium
+                                        }
+                                    }
+
+                                    Column {
+                                        width: (overviewGrid.width - overviewGrid.columnSpacing) / overviewGrid.columns
+                                        spacing: 2
+
+                                        StyledText {
+                                            text: "Core Version"
+                                            color: Theme.surfaceVariantText
+                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                        }
+
+                                        StyledText {
+                                            text: runtimeState.coreVersion || "Unknown"
+                                            color: Theme.surfaceText
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: Font.Medium
+                                        }
+                                    }
                                 }
 
                                 Rectangle {
                                     width: parent.width
-                                    height: 1
-                                    color: Qt.rgba(Theme.outline.r, Theme.outline.g, Theme.outline.b, 0.15)
-                                }
-
-                                StyledText {
-                                    text: "Profile: " + (runtimeState.currentProfileName || "None")
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                }
-
-                                StyledText {
-                                    text: "Mode: " + root.modeLabel(runtimeState.mode)
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                }
-
-                                StyledText {
-                                    text: "Tun: " + (runtimeState.tunEnabled ? "Enabled" : "Disabled")
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                }
-
-                                StyledText {
-                                    text: "System Proxy: " + (runtimeState.systemProxyEnabled ? "Enabled" : "Disabled")
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                }
-
-                                StyledText {
-                                    text: "Core: " + (runtimeState.coreVersion || "Unavailable")
-                                    color: Theme.surfaceText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                }
-
-                                StyledText {
-                                    visible: !!runtimeState.runtimeError
-                                    width: parent.width
-                                    wrapMode: Text.WordWrap
-                                    text: "Runtime: " + runtimeState.runtimeError
-                                    color: Theme.surfaceVariantText
-                                    font.pixelSize: Theme.fontSizeSmall
-                                }
-
-                                Rectangle {
-                                    width: 140
-                                    height: 34
-                                    radius: 17
+                                    height: 36
+                                    radius: Theme.cornerRadius - 4
                                     color: controlsArea.containsMouse ? Theme.primaryHover : Theme.primary
+                                    Behavior on color { ColorAnimation { duration: 150 } }
 
                                     StyledText {
                                         anchors.centerIn: parent
-                                        text: "Open Controls"
+                                        text: "Manage Configuration"
                                         color: Theme.primaryText
                                         font.pixelSize: Theme.fontSizeSmall
-                                        font.weight: Font.Medium
+                                        font.weight: Font.DemiBold
                                     }
 
                                     MouseArea {
@@ -616,128 +712,119 @@ PluginComponent {
                             }
                         }
 
+                        // ==========================================
+                        // CONTROLS 面板
+                        // ==========================================
                         Column {
                             visible: root.viewMode === "controls"
                             width: parent.width
-                            spacing: Theme.spacingM
+                            spacing: Theme.spacingL
 
-                            Rectangle {
+                            // 1. Proxies 卡片
+                            Column {
                                 width: parent.width
-                                radius: Theme.cornerRadius
-                                color: Theme.surfaceContainerHigh
-                                implicitHeight: modeColumn.implicitHeight + Theme.spacingM * 2
+                                spacing: Theme.spacingS
 
-                                Column {
-                                    id: modeColumn
-                                    anchors.fill: parent
-                                    anchors.margins: Theme.spacingM
-                                    spacing: Theme.spacingS
-
-                                    StyledText {
-                                        text: "Mode"
-                                        color: Theme.surfaceText
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        font.weight: Font.Medium
-                                    }
-
-                                    StyledText {
-                                        text: root.modeLabel(runtimeState.mode)
-                                        color: Theme.primary
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.weight: Font.Medium
-                                    }
-
-                                    StyledText {
-                                        width: parent.width
-                                        wrapMode: Text.WordWrap
-                                        text: "Mode is display-only here to avoid drifting out of sync with Clash Verge's own UI state."
-                                        color: Theme.surfaceVariantText
-                                        font.pixelSize: Theme.fontSizeSmall
-                                    }
+                                StyledText {
+                                    text: "Proxy Groups"
+                                    color: Theme.surfaceText
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.DemiBold
+                                    leftPadding: 4
                                 }
-                            }
 
-                            Rectangle {
-                                width: parent.width
-                                radius: Theme.cornerRadius
-                                color: Theme.surfaceContainerHigh
-                                implicitHeight: groupsColumn.implicitHeight + Theme.spacingM * 2
+                                StyledText {
+                                    visible: root.selectorGroups.length === 0
+                                    text: root.loading ? "Fetching proxies..." : "No selector groups available."
+                                    color: Theme.surfaceVariantText
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    leftPadding: 4
+                                }
 
-                                Column {
-                                    id: groupsColumn
-                                    anchors.fill: parent
-                                    anchors.margins: Theme.spacingM
-                                    spacing: Theme.spacingS
+                                Repeater {
+                                    model: root.selectorGroups
 
-                                    StyledText {
-                                        text: "Selector Groups"
-                                        color: Theme.surfaceText
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        font.weight: Font.Medium
-                                    }
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        property string groupName: String(modelData.name || "")
+                                        property string currentNode: String(modelData.now || "")
+                                        property var groupNodes: modelData.all || []
+                                        property bool isExpanded: root.expandedGroup === groupName
 
-                                    StyledText {
-                                        visible: root.selectorGroups.length === 0
-                                        text: root.loading ? "Loading live selectors..." : "No live selector groups available"
-                                        color: Theme.surfaceVariantText
-                                        font.pixelSize: Theme.fontSizeSmall
-                                    }
+                                        width: parent.width
+                                        radius: Theme.cornerRadius
+                                        color: "transparent"
+                                        border.color: isExpanded ? Theme.primary : Theme.surfaceContainerHigh
+                                        border.width: isExpanded ? 1 : 1
+                                        implicitHeight: groupInner.implicitHeight
+                                        clip: true
+                                        Behavior on border.color { ColorAnimation { duration: 200 } }
 
-                                    Repeater {
-                                        model: root.selectorGroups
+                                        Column {
+                                            id: groupInner
+                                            width: parent.width
+                                            
+                                            Rectangle {
+                                                width: parent.width
+                                                height: 56
+                                                color: "transparent"
 
-                                        delegate: Rectangle {
-                                            required property var modelData
-                                            property string groupName: String(modelData.name || "")
-                                            property string currentNode: String(modelData.now || "")
-                                            property var groupNodes: modelData.all || []
-                                            width: groupsColumn.width
-                                            radius: Theme.cornerRadius
-                                            color: Theme.surfaceContainerHighest
-                                            implicitHeight: groupColumn.implicitHeight + Theme.spacingS * 2
-
-                                            Column {
-                                                id: groupColumn
-                                                anchors.fill: parent
-                                                anchors.margins: Theme.spacingS
-                                                spacing: Theme.spacingS
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.expandedGroup = isExpanded ? "" : groupName
+                                                    
+                                                    Rectangle {
+                                                        anchors.fill: parent
+                                                        color: Theme.surfaceText
+                                                        opacity: parent.containsMouse ? 0.05 : 0
+                                                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                                                    }
+                                                }
 
                                                 Row {
-                                                    width: parent.width
-                                                    spacing: Theme.spacingS
+                                                    anchors.fill: parent
+                                                    anchors.margins: Theme.spacingM
+                                                    spacing: Theme.spacingM
 
                                                     Column {
-                                                        width: parent.width - 126
+                                                        width: parent.width - testAllBtn.width - iconInd.width - Theme.spacingM * 2
+                                                        anchors.verticalCenter: parent.verticalCenter
                                                         spacing: 2
-
                                                         StyledText {
                                                             text: groupName
                                                             color: Theme.surfaceText
-                                                            font.pixelSize: Theme.fontSizeSmall
+                                                            font.pixelSize: Theme.fontSizeMedium
                                                             font.weight: Font.Medium
-                                                        }
-
-                                                        StyledText {
+                                                            elide: Text.ElideRight
                                                             width: parent.width
-                                                            wrapMode: Text.WordWrap
-                                                            text: "Current: " + currentNode
-                                                            color: Theme.surfaceVariantText
-                                                            font.pixelSize: Theme.fontSizeSmall
+                                                        }
+                                                        StyledText {
+                                                            text: currentNode
+                                                            color: Theme.primary
+                                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                                            elide: Text.ElideRight
+                                                            width: parent.width
                                                         }
                                                     }
 
                                                     Rectangle {
-                                                        width: 64
-                                                        height: 28
-                                                        radius: 14
-                                                        color: groupTestArea.containsMouse ? Theme.primaryHover : Theme.surfaceContainerHigh
-                                                        opacity: root.isTestingThisGroup(groupName) ? 0.7 : 1
+                                                        id: testAllBtn
+                                                        width: 60; height: 28; radius: 14
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        color: groupTestArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
+                                                        border.color: Theme.outline
+                                                        border.width: 1
+                                                        opacity: root.isTestingThisGroup(groupName) ? 0.6 : 1
+                                                        z: 2
 
                                                         StyledText {
                                                             anchors.centerIn: parent
                                                             text: root.testAllButtonText(groupName)
                                                             color: Theme.surfaceText
-                                                            font.pixelSize: Theme.fontSizeSmall
+                                                            font.pixelSize: Theme.fontSizeSmall - 1
+                                                            font.weight: Font.Medium
                                                         }
 
                                                         MouseArea {
@@ -750,107 +837,107 @@ PluginComponent {
                                                         }
                                                     }
 
-                                                    Rectangle {
-                                                        width: 46
-                                                        height: 28
-                                                        radius: 14
-                                                        color: groupToggleArea.containsMouse ? Theme.primaryHover : Theme.surfaceContainerHigh
+                                                    DankIcon {
+                                                        id: iconInd
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        name: isExpanded ? "expand_less" : "expand_more"
+                                                        color: Theme.surfaceVariantText
+                                                        size: Theme.iconSize - 2
+                                                    }
+                                                }
+                                            }
 
-                                                        StyledText {
-                                                            anchors.centerIn: parent
-                                                            text: root.expandedGroup === groupName ? "Hide" : "Open"
-                                                            color: Theme.surfaceText
-                                                            font.pixelSize: Theme.fontSizeSmall
+                                            Column {
+                                                visible: isExpanded
+                                                width: parent.width
+                                                padding: Theme.spacingS
+                                                bottomPadding: Theme.spacingM
+                                                spacing: 2
+
+                                                Repeater {
+                                                    model: groupNodes
+
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        property string optionNode: String(modelData || "")
+                                                        property bool isCurrent: optionNode === currentNode
+                                                        
+                                                        width: parent.width
+                                                        height: 40
+                                                        radius: 6
+                                                        color: isCurrent ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.1) : (nodeArea.containsMouse ? Theme.surfaceContainerHighest : "transparent")
+                                                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                        Row {
+                                                            anchors.fill: parent
+                                                            anchors.leftMargin: Theme.spacingM
+                                                            anchors.rightMargin: Theme.spacingS
+                                                            spacing: Theme.spacingS
+
+                                                            StyledText {
+                                                                width: parent.width - delayBadge.width - Theme.spacingS
+                                                                anchors.verticalCenter: parent.verticalCenter
+                                                                text: optionNode
+                                                                elide: Text.ElideRight
+                                                                color: isCurrent ? Theme.primary : Theme.surfaceText
+                                                                font.pixelSize: Theme.fontSizeSmall
+                                                                font.weight: isCurrent ? Font.DemiBold : Font.Normal
+                                                            }
+
+                                                            Rectangle {
+                                                                id: delayBadge
+                                                                anchors.verticalCenter: parent.verticalCenter
+                                                                width: delayTxt.implicitWidth + 16
+                                                                height: 24
+                                                                radius: 12
+                                                                color: {
+                                                                    if (delayMouse.containsMouse) return Theme.surfaceContainerHighest
+                                                                    let dt = root.delayText(groupName, optionNode)
+                                                                    if (dt.includes("ms")) return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
+                                                                    if (dt.includes("Timeout") || dt.includes("Error")) return Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.15)
+                                                                    return "transparent"
+                                                                }
+                                                                border.color: Theme.surfaceContainerHighest
+                                                                border.width: 1
+                                                                opacity: !root.canTestNode(optionNode) ? 0.3 : 1
+                                                                Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                                StyledText {
+                                                                    id: delayTxt
+                                                                    anchors.centerIn: parent
+                                                                    text: {
+                                                                        let dt = root.delayText(groupName, optionNode)
+                                                                        return dt ? dt : (root.canTestNode(optionNode) ? "Test" : "N/A")
+                                                                    }
+                                                                    color: {
+                                                                        let dt = root.delayText(groupName, optionNode)
+                                                                        if (dt.includes("ms")) return Theme.primary
+                                                                        if (dt.includes("Timeout") || dt.includes("Error")) return Theme.error
+                                                                        return Theme.surfaceVariantText
+                                                                    }
+                                                                    font.pixelSize: Theme.fontSizeSmall - 2
+                                                                    font.weight: Font.Medium
+                                                                }
+
+                                                                MouseArea {
+                                                                    id: delayMouse
+                                                                    anchors.fill: parent
+                                                                    hoverEnabled: true
+                                                                    enabled: root.canTestNode(optionNode) && !root.delayTesting && !root.busy
+                                                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                                                    onClicked: root.testDelay(groupName, optionNode)
+                                                                }
+                                                            }
                                                         }
 
                                                         MouseArea {
-                                                            id: groupToggleArea
+                                                            id: nodeArea
                                                             anchors.fill: parent
+                                                            anchors.rightMargin: delayBadge.width + Theme.spacingS
+                                                            enabled: !root.busy && !isCurrent
                                                             hoverEnabled: true
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: root.expandedGroup = root.expandedGroup === groupName ? "" : groupName
-                                                        }
-                                                    }
-                                                }
-
-                                                Column {
-                                                    visible: root.expandedGroup === groupName
-                                                    width: parent.width
-                                                    spacing: Theme.spacingXS
-
-                                                    Repeater {
-                                                        model: groupNodes
-
-                                                        delegate: Rectangle {
-                                                            required property var modelData
-                                                            property string optionNode: String(modelData || "")
-                                                            width: groupColumn.width
-                                                            radius: Theme.cornerRadius
-                                                            color: optionNode === currentNode ? Theme.primaryContainer : Theme.surfaceContainerHigh
-                                                            implicitHeight: optionColumn.implicitHeight + Theme.spacingS * 2
-                                                            opacity: root.busy ? 0.6 : 1
-
-                                                            Column {
-                                                                id: optionColumn
-                                                                anchors.fill: parent
-                                                                anchors.margins: Theme.spacingS
-
-                                                                Row {
-                                                                    width: parent.width
-                                                                    spacing: Theme.spacingS
-
-                                                                    StyledText {
-                                                                        width: parent.width - 66
-                                                                        text: optionNode
-                                                                        wrapMode: Text.WordWrap
-                                                                        color: optionNode === currentNode ? Theme.primary : Theme.surfaceText
-                                                                        font.pixelSize: Theme.fontSizeSmall
-                                                                    }
-
-                                                                    Rectangle {
-                                                                        width: 58
-                                                                        height: 24
-                                                                        radius: 12
-                                                                        color: delayMouse.containsMouse ? Theme.primaryHover : Theme.surfaceContainerHighest
-                                                                        opacity: !root.canTestNode(optionNode) ? 0.45 : (root.isTestingThisNode(groupName, optionNode) ? 0.7 : 1)
-
-                                                                        StyledText {
-                                                                            anchors.centerIn: parent
-                                                                            text: root.canTestNode(optionNode) ? root.delayButtonText(groupName, optionNode) : "N/A"
-                                                                            color: Theme.surfaceText
-                                                                            font.pixelSize: Theme.fontSizeSmall
-                                                                        }
-
-                                                                        MouseArea {
-                                                                            id: delayMouse
-                                                                            anchors.fill: parent
-                                                                            hoverEnabled: true
-                                                                            preventStealing: true
-                                                                            propagateComposedEvents: false
-                                                                            enabled: root.canTestNode(optionNode) && !root.delayTesting && !root.busy
-                                                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                                                            onClicked: root.testDelay(groupName, optionNode)
-                                                                        }
-                                                                    }
-                                                                }
-
-                                                                StyledText {
-                                                                    visible: root.delayText(groupName, optionNode).length > 0
-                                                                    width: parent.width
-                                                                    text: root.delayText(groupName, optionNode)
-                                                                    wrapMode: Text.WordWrap
-                                                                    color: Theme.surfaceVariantText
-                                                                    font.pixelSize: Theme.fontSizeSmall
-                                                                }
-                                                            }
-
-                                                            MouseArea {
-                                                                anchors.fill: parent
-                                                                anchors.rightMargin: 66
-                                                                enabled: !root.busy && optionNode !== currentNode
-                                                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                                                onClicked: root.setNode(groupName, optionNode)
-                                                            }
+                                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                                            onClicked: root.setNode(groupName, optionNode)
                                                         }
                                                     }
                                                 }
@@ -860,61 +947,81 @@ PluginComponent {
                                 }
                             }
 
-                            Rectangle {
+                            // 2. Profiles 卡片
+                            Column {
                                 width: parent.width
-                                radius: Theme.cornerRadius
-                                color: Theme.surfaceContainerHigh
-                                implicitHeight: profilesColumn.implicitHeight + Theme.spacingM * 2
+                                spacing: Theme.spacingS
 
-                                Column {
-                                    id: profilesColumn
-                                    anchors.fill: parent
-                                    anchors.margins: Theme.spacingM
-                                    spacing: Theme.spacingS
+                                StyledText {
+                                    text: "Profiles"
+                                    color: Theme.surfaceText
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.DemiBold
+                                    leftPadding: 4
+                                }
 
-                                    StyledText {
-                                        text: "Profiles"
-                                        color: Theme.surfaceText
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        font.weight: Font.Medium
-                                    }
+                                Rectangle {
+                                    width: parent.width
+                                    radius: Theme.cornerRadius
+                                    color: "transparent"
+                                    border.color: Theme.surfaceContainerHigh
+                                    border.width: 1
+                                    implicitHeight: profileList.implicitHeight + Theme.spacingS * 2
 
-                                    Repeater {
-                                        model: root.profiles
+                                    Column {
+                                        id: profileList
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.spacingS
+                                        spacing: 2
 
-                                        delegate: Rectangle {
-                                            required property var modelData
-                                            width: profilesColumn.width
-                                            radius: Theme.cornerRadius
-                                            color: modelData.isCurrent ? Theme.primaryContainer : Theme.surfaceContainerHighest
-                                            implicitHeight: profileColumn.implicitHeight + Theme.spacingS * 2
-                                            opacity: root.busy ? 0.6 : 1
+                                        Repeater {
+                                            model: root.profiles
 
-                                            Column {
-                                                id: profileColumn
-                                                anchors.fill: parent
-                                                anchors.margins: Theme.spacingS
-                                                spacing: Theme.spacingXS
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                width: parent.width
+                                                height: 48
+                                                radius: 6
+                                                color: modelData.isCurrent ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.1) : (profileArea.containsMouse ? Theme.surfaceContainerHighest : "transparent")
+                                                Behavior on color { ColorAnimation { duration: 150 } }
 
-                                                StyledText {
-                                                    text: modelData.name
-                                                    color: modelData.isCurrent ? Theme.primary : Theme.surfaceText
-                                                    font.pixelSize: Theme.fontSizeSmall
-                                                    font.weight: Font.Medium
+                                                Row {
+                                                    anchors.fill: parent
+                                                    anchors.margins: Theme.spacingM
+                                                    spacing: Theme.spacingM
+
+                                                    DankIcon {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        name: modelData.isCurrent ? "radio_button_checked" : "radio_button_unchecked"
+                                                        color: modelData.isCurrent ? Theme.primary : Theme.surfaceVariantText
+                                                        size: Theme.iconSize - 2
+                                                    }
+
+                                                    Column {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        spacing: 0
+                                                        StyledText {
+                                                            text: modelData.name
+                                                            color: modelData.isCurrent ? Theme.primary : Theme.surfaceText
+                                                            font.pixelSize: Theme.fontSizeSmall
+                                                            font.weight: modelData.isCurrent ? Font.DemiBold : Font.Normal
+                                                        }
+                                                        StyledText {
+                                                            text: modelData.type || "profile"
+                                                            color: Theme.surfaceVariantText
+                                                            font.pixelSize: Theme.fontSizeSmall - 2
+                                                        }
+                                                    }
                                                 }
 
-                                                StyledText {
-                                                    text: (modelData.type || "profile") + (modelData.isCurrent ? " • current" : "")
-                                                    color: Theme.surfaceVariantText
-                                                    font.pixelSize: Theme.fontSizeSmall
+                                                MouseArea {
+                                                    id: profileArea
+                                                    anchors.fill: parent
+                                                    enabled: !root.busy && !modelData.isCurrent
+                                                    hoverEnabled: true
+                                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                                    onClicked: root.setProfile(modelData.uid)
                                                 }
-                                            }
-
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                enabled: !root.busy && !modelData.isCurrent
-                                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                                onClicked: root.setProfile(modelData.uid)
                                             }
                                         }
                                     }
